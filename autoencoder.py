@@ -72,9 +72,14 @@ def convert(data):
         # Add this list of ratings to the new data
         new_data.append(list(ratings))
     return new_data
-#CONVERTING TRAINING SET INTO TORCH TESNOR
-test_set = torch.FloatTensor(test_set)
 
+training_set = convert(training_set)
+test_set = convert(test_set)
+
+
+#CONVERTING TRAINING SET INTO TORCH TESNOR
+training_set = torch.FloatTensor(training_set)
+test_set = torch.FloatTensor(test_set)
 #Creating the architechture of the Neural Network
 #STACKED-AUTO-ENCODER
 class SAE(nn.Module):
@@ -115,9 +120,27 @@ for epoch in range(1, nb_epoch, + 1):
             loss = criterion(output, target) # We compute the loss between the predicted ratings and the actual ratings
             mean_corrector = nb_movies/float(torch.sum(target.data > 0) + 1e-10)            # The mean_corrector is used to only consider the movies that were actually rated by the user
             loss.backward() # We backpropagate the loss. This computes the gradients of the loss with respect to all the weights of the SAE
-            train_loss += np.sqrt(loss.data[0]*mean_corrector)# Update the train_loss
+            train_loss += np.sqrt(loss.data * mean_corrector)
+            # Update the train_loss
             s += 1.
             optimizer.step()## This performs the actual updates of the weights
-    print('epoch: ' + str(epoch) + 'loss: ' + train_loss)
+    print('epoch: '+str(epoch)+'loss: '+ str(train_loss/s))
             
         
+#TESTING the SAE 
+test_loss = 0
+s = 0.
+for id_user in range(nb_users):
+    input = Variable(training_set[id_user]).unsqueeze(0)
+    target = Variable(test_set[id_user]).unsqueeze(0)
+    if torch.sum(target.data > 0) > 0:# We only consider users that have rated at least one movie
+        output = sae(input)
+        target.require_grad = False
+        output[target == 0] = 0
+        loss = criterion(output, target) # We compute the loss between the predicted ratings and the actual ratings
+        mean_corrector = nb_movies/float(torch.sum(target.data > 0) + 1e-10)            # The mean_corrector is used to only consider the movies that were actually rated by the user
+        test_loss += np.sqrt(loss.data * mean_corrector)
+        s += 1.
+print('test_loss: '+ str(test_loss/s))
+        
+    
